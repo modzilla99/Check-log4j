@@ -6,13 +6,15 @@ Alternatively, split this by starting letter and run several simultaneous logs. 
 
 ## What does it do?
 
-The script queries your AD for any and all servers. Then filters those by name based on the prefix you entered.  <br/>
-This servers are then scanned for the presence of log4j-core files on the filesystem, which indicate a vulnerable library being present.
+The script queries your AD for all Windows-Server based servers. <br/>
+This servers are then scanned for the presence of log4j files on the filesystem, which indicate a vulnerable library being present.
 (unfortunately single-threaded...)
 
 Version 1 isn't impacted, as the functionality being exploited was added in log4j2.
 
 So once you have the logfile, check which servers have log4j version 2, and go from there. <br/>
+
+You can activate **DeepScan** by using the switch `-DeepScan`. This will scan for all jar-Files and print them out if no log4j-named file was found. In contrast to Linux it is not possible to automatically look for log4j within these jars. 
 
 ### Additional info
 For more details, I advise to check the following links:
@@ -23,23 +25,25 @@ For more details, I advise to check the following links:
 
 ## Example
 
-customer: 'Contoso'
-
-server naming scheme: 'Con-$svrXY'
-
-use prefix: 'Con-'
-
-
-If you want to split the scan into mulitple logs or have several naming schemes, run several instances simultaneously.
-
-Examples:
-
-prefix: 'Con-fil'
-
-prefix: 'Con-app'
-
+```
+Unblock-File check-log4j.ps1
+.\check-log4j.ps1 -logfile C:\temp\logoutput.txt [-DeepScan]
+```
 
 # Linux
-to check linux servers, you can use the follwing query in terminal: - go to / first.
+to check linux servers, you can use the follwing query in terminal:
 
-'find . -name log4j-*.jar'
+```
+find / -name log4j-*.jar
+```
+
+To check jar files if they have log4j included type the following (this may take a while...):
+
+```
+sudo find / -name \*.jar \
+	-exec sh -c \
+	"if zipinfo {} | grep JndiLookup.class; \
+	 then \
+	     echo -e '{}\n'; \n
+	 fi" \; 2>/dev/null
+```
