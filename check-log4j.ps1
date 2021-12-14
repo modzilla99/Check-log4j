@@ -35,35 +35,35 @@ if ( $DeepScan ) {
             echo "$ComputerName (Online)"
             try {
                 Invoke-Command -ComputerName $ComputerName -ScriptBlock {
-                $drives = Get-PSDrive -PSProvider FileSystem
-                $jars = @()
-                foreach ($drive in $drives) {
-                    if ($drive.Name -notin $using:ignoreDrives) {
-                        $items = Get-ChildItem -Path $drive.Root -Filter $using:keyword -ErrorAction SilentlyContinue -File -Recurse
-                        foreach ($item in $items) {
-                            $jars += $item.FullName
+                    $drives = Get-PSDrive -PSProvider FileSystem
+                    $jars = @()
+                    foreach ($drive in $drives) {
+                        if ($drive.Name -notin $using:ignoreDrives) {
+                            $items = Get-ChildItem -Path $drive.Root -Filter $using:keyword -ErrorAction SilentlyContinue -File -Recurse
+                            foreach ($item in $items) {
+                                $jars += $item.FullName
+                            }
                         }
                     }
-                }
-                if ( $jars[0] -eq $null ) {
-                    echo "No jars were found"
-                } else {
-                    
-                    $log4jjars = $JARs | Select-String -SimpleMatch "log4j"
-                    
-                    if ( $log4jjars -eq $null ) {
-                    
-                        echo "No log4j-Files were found, but it might be integrated in one of the following jars:"
-                        $jars
+                    if ( $jars[0] -eq $null ) {
+                        echo "No jars were found"
                     } else {
-                        echo "The following log4js-Files were found:"
-                        foreach ( $file in $log4jjars ) {
-                            echo "$file"
+                        
+                        $log4jjars = $JARs | Select-String -SimpleMatch "log4j"
+                        
+                        if ( $log4jjars -eq $null ) {
+                        
+                            echo "No log4j-Files were found, but it might be integrated in one of the following jars:"
+                            $jars
+                        } else {
+                            echo "The following log4js-Files were found:"
+                            foreach ( $file in $log4jjars ) {
+                                echo "$file"
+                            }
                         }
                     }
+                    echo ""
                 }
-                echo ""
-            }
             }
             catch {
                 echo Error
@@ -86,21 +86,25 @@ else {
         $ComputerName = $computer.name
         if ((Test-Connection -computername $ComputerName -Quiet) -eq $true) {
             echo "$ComputerName (Online)"
-            Invoke-Command -ComputerName $ComputerName -ScriptBlock {
-                $drives = Get-PSDrive -PSProvider FileSystem
-                foreach ($drive in $drives) {
-                    if ($drive.Name -notin $using:ignoreDrives) {
-                        $items = Get-ChildItem -Path $drive.Root -Filter $using:keyword -ErrorAction SilentlyContinue -File -Recurse
-                        foreach ($item in $items) {
-                            $item.FullName # Show all files found with full drive and path
+            try {
+                Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+                    $drives = Get-PSDrive -PSProvider FileSystem
+                    foreach ($drive in $drives) {
+                        if ($drive.Name -notin $using:ignoreDrives) {
+                            $items = Get-ChildItem -Path $drive.Root -Filter $using:keyword -ErrorAction SilentlyContinue -File -Recurse
+                            foreach ($item in $items) {
+                                $item.FullName # Show all files found with full drive and path
+                            }
                         }
                     }
                 }
-            } else {
+            }
+            catch {
                 If ($retryFile -ne $null) {
                     echo "`"$ComputerName`"" >> $retryFile
                 }
             }
+            echo ""
         }
         else{            
             "$ComputerName (Unavailable)"
