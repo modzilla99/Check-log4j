@@ -1,6 +1,7 @@
 param (
     [Parameter (Mandatory=$true)][String]$logfile,
-    [Switch]$DeepScan
+    [Switch]$DeepScan,
+    [String]$retryFile
 )
 $computerNames = @(get-adcomputer -Filter { OperatingSystem -Like '*Windows Server*' } | Select name )
 $ignoreDrives = @("A", "B" )
@@ -14,14 +15,26 @@ If ( (test-path $logfile) ) {
     }
 }
 
+If ($retryFile -ne $null -and (Test-Path $retryFile)) {
+    $computerNames = Import-Csv $retryFile
+    echo '#TYPE Selected.Microsoft.ActiveDirectory.Management.ADComputer' > $retryFile
+    echo '"name"' >> $retryFile
+} elseif ($retryFile -ne $null -and -not (Test-Path $retryFile)) {
+    echo '#TYPE Selected.Microsoft.ActiveDirectory.Management.ADComputer' > $retryFile
+    echo '"name"' >> $retryFile
+}
+
+
 Start-Transcript -Path $logfile -NoClobber
 
 if ( $DeepScan ) {
     $keyword = "*.jar"
     foreach ($computer in $computerNames) {
-        $computer.name # Show computername
-        if ((Test-Connection -computername $computer.name -Quiet) -eq $true) {
-            Invoke-Command -ComputerName $computer.name -ScriptBlock {
+        $ComputerName = $computer.name
+        if ((Test-Connection -computername $ComputerName -Quiet) -eq $true) {
+            echo "$ComputerName (Online)"
+            try {
+                Invoke-Command -ComputerName $ComputerName -ScriptBlock {
                 $drives = Get-PSDrive -PSProvider FileSystem
                 $jars = @()
                 foreach ($drive in $drives) {
@@ -51,18 +64,29 @@ if ( $DeepScan ) {
                 }
                 echo ""
             }
+            }
+            catch {
+                echo Error
+                If ($retryFile -ne $null) {
+                    echo "`"$ComputerName`"" >> $retryFile
+                }
+            }
         }
-        else{
-         "$computer (Unavailable)"
+        else{            
+            "$ComputerName (Unavailable)"
+            If ($retryFile -ne $null) {
+                echo "`"$ComputerName`"" >> $retryFile
+            }
         }
     }
 }
 else {
     $keyword = "*log4j*.jar"
     foreach ($computer in $computerNames) {
-        $computer.name # Show computername
-        if ((Test-Connection -computername $computer.name -Quiet) -eq $true) {
-            Invoke-Command -ComputerName $computer.name -ScriptBlock {
+        $ComputerName = $computer.name
+        if ((Test-Connection -computername $ComputerName -Quiet) -eq $true) {
+            echo "$ComputerName (Online)"
+            Invoke-Command -ComputerName $ComputerName -ScriptBlock {
                 $drives = Get-PSDrive -PSProvider FileSystem
                 foreach ($drive in $drives) {
                     if ($drive.Name -notin $using:ignoreDrives) {
@@ -72,10 +96,17 @@ else {
                         }
                     }
                 }
+            } else {
+                If ($retryFile -ne $null) {
+                    echo "`"$ComputerName`"" >> $retryFile
+                }
             }
         }
-        else{
-         "$computer (Unavailable)"
+        else{            
+            "$ComputerName (Unavailable)"
+            If ($retryFile -ne $null) {
+                echo "`"$ComputerName`"" >> $retryFile
+            }
         }
     }
 }
@@ -87,4 +118,3 @@ This is a quick script, don't expect it to be too neat.
 It should work for it's intended purpose, readability may be a bit harsh.
 
 #>
-
