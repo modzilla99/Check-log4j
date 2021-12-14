@@ -1,31 +1,53 @@
 param (
     [Parameter (Mandatory=$true)][String]$logfile,
     [Switch]$DeepScan,
+    [String]$hosts,
     [String]$retryFile
 )
-$computerNames = @(get-adcomputer -Filter { OperatingSystem -Like '*Windows Server*' } | Select name )
+
+$computerNames = if ($hosts -ne "") {
+    try {
+        Import-Csv $hosts
+    }
+    catch {
+        echo "Error importing `"$hosts`""
+        Write-Debug $_
+        exit 1
+    }
+} else {
+    @(get-adcomputer -Filter { OperatingSystem -Like '*Windows Server*' } | Select name )
+}
+
+
 $ignoreDrives = @("A", "B" )
 
 
-If ( (test-path $logfile) ) {
-    try {
-        rm $logfile
-    } catch {
-        exit 1
-    }
-}
 
-If ($retryFile -ne $null -and (Test-Path $retryFile)) {
+If ($retryFile -ne "" -and (Test-Path $retryFile)) {
     $computerNames = Import-Csv $retryFile
     echo '#TYPE Selected.Microsoft.ActiveDirectory.Management.ADComputer' > $retryFile
     echo '"name"' >> $retryFile
-} elseif ($retryFile -ne $null -and -not (Test-Path $retryFile)) {
+} elseif ($retryFile -ne "" -and -not (Test-Path $retryFile)) {
     echo '#TYPE Selected.Microsoft.ActiveDirectory.Management.ADComputer' > $retryFile
     echo '"name"' >> $retryFile
 }
 
 
-Start-Transcript -Path $logfile -NoClobber
+
+try {
+    Start-Transcript -Path $logfile -NoClobber
+} catch {
+    if ( $retryFile -ne "") {
+        rm $retryFile
+    }
+    echo "Error Starting transcript"
+    echo ""
+    echo "Please remove old log before running this script again"
+    Write-Debug $_
+    exit 1
+}
+echo "Logging to `"$logfile`" started"
+
 
 if ( $DeepScan ) {
     $keyword = "*.jar"
